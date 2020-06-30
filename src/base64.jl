@@ -94,36 +94,38 @@ end
 
 function Encode!(enc::Encoding, dst::Array{UInt8, 1}, src::Array{UInt8, 1}) :: Nothing
   isempty(src) && return nothing
-  di, si, n = 1, 1, convert(Int, floor(length(src) / 3) * 3)
-  while si <= n
-    v = UInt(src[si+0])<<16 | UInt(src[si+1])<<8 | UInt(src[si+2])
-    @inbounds dst[di+0] = enc.encode[v>>18&0x3f + 1]
-    @inbounds dst[di+1] = enc.encode[v>>12&0x3f + 1]
-    @inbounds dst[di+2] = enc.encode[v>>6&0x3f + 1]
-    @inbounds dst[di+3] = enc.encode[v&0x3f + 1]
+  di, si, n = 0, 0, convert(Int, floor(length(src) / 3) * 3)
+  while si < n
+    v = UInt(src[si+1])<<16 | UInt(src[si+2])<<8 | UInt(src[si+3])
+    @inbounds dst[di+1] = enc.encode[v>>18&0x3f + 1]
+    @inbounds dst[di+2] = enc.encode[v>>12&0x3f + 1]
+    @inbounds dst[di+3] = enc.encode[v>>6&0x3f + 1]
+    @inbounds dst[di+4] = enc.encode[v&0x3f + 1]
 
     si += 3
     di += 4
   end
 
-  rem = length(src) - si + 1
+  rem = length(src) - si
   rem == 0 && return nothing
 
-  v = UInt(src[si+0]) << 16
-  rem == 2 && (v |= UInt(src[si+1]) << 8)
+  v = UInt(src[si+1]) << 16
+  if rem == 2
+    v |= UInt(src[si+2]) << 8
+  end
 
-  @inbounds dst[di+0] = enc.encode[v>>18&0x3f + 1]
-  @inbounds dst[di+1] = enc.encode[v>>12&0x3f + 1]
+  @inbounds dst[di+1] = enc.encode[v>>18&0x3f + 1]
+  @inbounds dst[di+2] = enc.encode[v>>12&0x3f + 1]
   
   if rem == 2
-    @inbounds dst[di+2] = enc.encode[v>>6&0x3f]
+    @inbounds dst[di+3] = enc.encode[v>>6&0x3f + 1]
 		if enc.padChar != NoPadding
-			@inbounds dst[di+3] = enc.padChar
+			@inbounds dst[di+4] = enc.padChar
     end
   elseif rem == 1
     if enc.padChar != NoPadding
-      @inbounds dst[di+2] = enc.padChar
       @inbounds dst[di+3] = enc.padChar
+      @inbounds dst[di+4] = enc.padChar
     end
   end
   nothing
@@ -218,7 +220,6 @@ end
 function Decode!(enc::Encoding, dst::Array{UInt8, 1}, src::Array{UInt8, 1}) :: Int
   isempty(src) && return nothing
   si, n = 0, 0
-  @show src
   while length(src) - si >= 8 && length(dst) - n >= 8
     dn = assemble_64(
       enc.decodeMap[src[si+1]],
@@ -236,7 +237,6 @@ function Decode!(enc::Encoding, dst::Array{UInt8, 1}, src::Array{UInt8, 1}) :: I
       si += 8
     else
       si, ni = decode_quantum!(enc, view(dst, n+1:length(dst)), src, si)
-      @show si
       n += ni
     end
   end

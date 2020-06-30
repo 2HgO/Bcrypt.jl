@@ -48,8 +48,10 @@ GenerateFromPassword(password::String, cost::Int = DefaultCost) = GenerateFromPa
 	# try
 		p = newFromHash(hashedPassword)
 		other = bcrypt(password, p.cost, p.salt)
-		println(length(p.hash))
-		constantTimeCompare(hash(hashed(other, p.salt, p.cost, p.major, p.minor)), hash(p)) == 1 && return true
+		ot = hashed(other, p.salt, p.cost, p.major, p.minor)
+		c = constantTimeCompare(hash(hashed(other, p.salt, p.cost, p.major, p.minor)), hash(p))
+		@show c
+		c == 1
 	# catch
 	# end
 	# return false
@@ -58,19 +60,14 @@ CompareHashAndPassword(hashedPassword::String, password::String) = CompareHashAn
 
 @inline function constantTimeCompare(a::Array{UInt8, 1}, b::Array{UInt8, 1}) :: Int
 	length(a) != length(b) && return 0
-	@show a
-	@show b
 	v = UInt8(0)
 	for i = 1:length(a)
 		v |= a[i] ⊻ b[i]
 	end
-	@show v
-	c = constantTimeByteEq(v, UInt8(0))
-	@show c
-	c
+	constantTimeByteEq(v, UInt8(0))
 end
 
-constantTimeByteEq(a::UInt8, b::UInt8) = Int((UInt32(a⊻b) - 1) >> 31)
+constantTimeByteEq(a::UInt8, b::UInt8) = convert(Int, UInt32(a^b))
 
 function Cost(hashedPassword::Array{UInt8, 1}) :: Int
 	newFromHash(hashedPassword).cost
@@ -105,11 +102,17 @@ function bcrypt(password::Array{UInt8, 1}, cost::Int, salt::Array{UInt8, 1}) :: 
 	c = expensiveBlowfishSetup(password, UInt32(cost), salt)
 	for i = 1:8:24
 		for j = 1:64
-			Blowfish.Encrypt!(c, cipherData[i:i+7], cipherData[i:i+7])
+			Blowfish.Encrypt!(c, view(cipherData, i:i+7), cipherData[i:i+7])
 		end
 	end
 	bcrypt_b64_encode(cipherData[1:maxCryptedHashSize])
 end
+Blowfish.Encrypt!(c::Blowfish.Cipher, a::AbstractArray{UInt8, 1}, b::AbstractArray{UInt8, 1}) = begin
+	d = Array{UInt8, 1}(a)
+	Blowfish.Encrypt!(c, d, b)
+	copyto!(a, d)
+end
+
 
 function expensiveBlowfishSetup(key::Array{UInt8, 1}, cost::UInt32, salt::Array{UInt8, 1}) :: Blowfish.Cipher
 	csalt = bcrypt_b64_decode(salt)

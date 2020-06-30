@@ -20,7 +20,9 @@ end
 
 @inline function bcrypt_b64_decode(src::Array{UInt8, 1}) :: Array{UInt8, 1}
 	j = 4-(length(src) % 4)
-	append!(src, fill(0x3d, j))
+	for _ = 0:j-1
+		push!(src, 0x3d)
+	end
 	n = base64.DecodedLen(BcryptEncoding, length(src))
 	dst = zeros(UInt8, n)
 	i = base64.Decode!(BcryptEncoding, dst, src)
