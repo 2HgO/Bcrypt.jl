@@ -1,5 +1,11 @@
 module Bcrypt
 
+export base64
+export GenerateFromPassword, CompareHashAndPassword
+export Cost, Hash
+export InvalidCost, HashTooShort, HashVersionTooNew, InvalidHashPrefix
+export MinCost, MaxCost, DefaultCost
+
 include("base64.jl")
 include("bcrypt_b64.jl"); using .bcrypt_b64
 
@@ -30,6 +36,8 @@ const magicCipherData = (
 
 struct InvalidCost <: Exception end
 struct HashTooShort <: Exception end
+struct HashVersionTooNew <: Exception end
+struct InvalidHashPrefix <: Exception end
 
 struct hashed
 	hash::Array{UInt8, 1}
@@ -40,21 +48,20 @@ struct hashed
 end
 
 @inline function GenerateFromPassword(password::Array{UInt8, 1}, cost::Int = DefaultCost) :: Array{UInt8, 1}
-	hash(newFromPassword(password, cost))
+	hash(newFromPassword(password[1:end], cost))
 end
 GenerateFromPassword(password::String, cost::Int = DefaultCost) = GenerateFromPassword(Array{UInt8, 1}(password), cost) 
 
 @inline function CompareHashAndPassword(hashedPassword::Array{UInt8, 1}, password::Array{UInt8, 1}) :: Bool
-	# try
-		p = newFromHash(hashedPassword)
-		other = bcrypt(password, p.cost, p.salt)
+	try
+		p = newFromHash(hashedPassword[1:end])
+		other = bcrypt(password[1:end], p.cost, p.salt)
 		ot = hashed(other, p.salt, p.cost, p.major, p.minor)
 		c = constantTimeCompare(hash(hashed(other, p.salt, p.cost, p.major, p.minor)), hash(p))
-		@show c
-		c == 1
-	# catch
-	# end
-	# return false
+		return c
+	catch
+		return false
+	end
 end
 CompareHashAndPassword(hashedPassword::String, password::String) = CompareHashAndPassword(Array{UInt8, 1}(hashedPassword), Array{UInt8, 1}(password))
 
@@ -64,7 +71,7 @@ CompareHashAndPassword(hashedPassword::String, password::String) = CompareHashAn
 	for i = 1:length(a)
 		v |= a[i] ⊻ b[i]
 	end
-	constantTimeByteEq(v, UInt8(0))
+	v == 0x00
 end
 
 constantTimeByteEq(a::UInt8, b::UInt8) = convert(Int, UInt32(a^b))
@@ -150,8 +157,8 @@ end
 Base.hash(p::hashed) = Hash(p)
 
 function decodeVersion(src::Array{UInt8, 1}) :: Tuple{Int, UInt8, UInt8}
-	src[1] != 0x24 && throw("")
-	src[2] > majorVersion && throw("")
+	src[1] != 0x24 && throw(InvalidHashPrefix())
+	src[2] > majorVersion && throw(HashVersionTooNew())
 	major = src[2]
 	n, minor = 3, UInt8(0)
 	if src[3] != 0x24
