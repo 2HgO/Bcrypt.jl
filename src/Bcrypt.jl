@@ -114,12 +114,6 @@ function bcrypt(password::Array{UInt8, 1}, cost::Int, salt::Array{UInt8, 1}) :: 
 	end
 	bcrypt_b64_encode(cipherData[1:maxCryptedHashSize])
 end
-Blowfish.Encrypt!(c::Blowfish.Cipher, a::AbstractArray{UInt8, 1}, b::AbstractArray{UInt8, 1}) = begin
-	d = Array{UInt8, 1}(a)
-	Blowfish.Encrypt!(c, d, b)
-	copyto!(a, d)
-end
-
 
 function expensiveBlowfishSetup(key::Array{UInt8, 1}, cost::UInt32, salt::Array{UInt8, 1}) :: Blowfish.Cipher
 	csalt = bcrypt_b64_decode(salt)
