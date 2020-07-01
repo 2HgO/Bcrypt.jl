@@ -47,12 +47,20 @@ struct hashed
 	minor::UInt8
 end
 
-@inline function GenerateFromPassword(password::Array{UInt8, 1}, cost::Int = DefaultCost) :: Array{UInt8, 1}
+"""
+	GenerateFromPassword returns the bcrypt hash of the password at the given cost.
+	If the cost given is less than `MinCost`, the cost will be set to `DefaultCost`, instead.
+	Use `CompareHashAndPassword`, as defined in this package, to compare the returned hashed password with its cleartext version.
+"""
+@inline function GenerateFromPassword(password::AbstractArray{UInt8, 1}, cost::Int = DefaultCost) :: Array{UInt8, 1}
 	hash(newFromPassword(password[1:end], cost))
 end
 GenerateFromPassword(password::String, cost::Int = DefaultCost) = GenerateFromPassword(Array{UInt8, 1}(password), cost) 
 
-@inline function CompareHashAndPassword(hashedPassword::Array{UInt8, 1}, password::Array{UInt8, 1}) :: Bool
+"""
+	CompareHashAndPassword compares a bcrypt hashed password with its possible plaintext equivalent. Returns `true` on success, or `false` on failure.
+"""
+@inline function CompareHashAndPassword(hashedPassword::AbstractArray{UInt8, 1}, password::Array{UInt8, 1}) :: Bool
 	try
 		p = newFromHash(hashedPassword[1:end])
 		other = bcrypt(password[1:end], p.cost, p.salt)
@@ -65,7 +73,7 @@ GenerateFromPassword(password::String, cost::Int = DefaultCost) = GenerateFromPa
 end
 CompareHashAndPassword(hashedPassword::String, password::String) = CompareHashAndPassword(Array{UInt8, 1}(hashedPassword), Array{UInt8, 1}(password))
 
-@inline function constantTimeCompare(a::Array{UInt8, 1}, b::Array{UInt8, 1}) :: Int
+@inline function constantTimeCompare(a::AbstractArray{UInt8, 1}, b::Array{UInt8, 1}) :: Int
 	length(a) != length(b) && return 0
 	v = UInt8(0)
 	for i = 1:length(a)
@@ -74,13 +82,11 @@ CompareHashAndPassword(hashedPassword::String, password::String) = CompareHashAn
 	v == 0x00
 end
 
-constantTimeByteEq(a::UInt8, b::UInt8) = convert(Int, UInt32(a^b))
-
-function Cost(hashedPassword::Array{UInt8, 1}) :: Int
+function Cost(hashedPassword::AbstractArray{UInt8, 1}) :: Int
 	newFromHash(hashedPassword).cost
 end
 
-function newFromPassword(password::Array{UInt8, 1}, cost::Int) :: hashed
+function newFromPassword(password::AbstractArray{UInt8, 1}, cost::Int) :: hashed
 	if cost < MinCost
 		cost = DefaultCost
 	end
@@ -92,7 +98,7 @@ function newFromPassword(password::Array{UInt8, 1}, cost::Int) :: hashed
 	hashed(hash, salt, cost, majorVersion, minorVersion)
 end
 
-function newFromHash(hashedSecret::Array{UInt8, 1}) :: hashed
+function newFromHash(hashedSecret::AbstractArray{UInt8, 1}) :: hashed
 	length(hashedSecret) < minHashSize && throw(HashTooShort())
 	n, minor, major = decodeVersion(hashedSecret)
 	hashedSecret = hashedSecret[n+1:end]
@@ -104,7 +110,7 @@ function newFromHash(hashedSecret::Array{UInt8, 1}) :: hashed
 	hashed(hsh, salt, cost, major, minor)
 end
 
-function bcrypt(password::Array{UInt8, 1}, cost::Int, salt::Array{UInt8, 1}) :: Array{UInt8, 1}
+function bcrypt(password::AbstractArray{UInt8, 1}, cost::Int, salt::AbstractArray{UInt8, 1}) :: Array{UInt8, 1}
 	cipherData = collect(magicCipherData)
 	c = expensiveBlowfishSetup(password, UInt32(cost), salt)
 	for i = 1:8:24
@@ -115,7 +121,7 @@ function bcrypt(password::Array{UInt8, 1}, cost::Int, salt::Array{UInt8, 1}) :: 
 	bcrypt_b64_encode(cipherData[1:maxCryptedHashSize])
 end
 
-function expensiveBlowfishSetup(key::Array{UInt8, 1}, cost::UInt32, salt::Array{UInt8, 1}) :: Blowfish.Cipher
+function expensiveBlowfishSetup(key::AbstractArray{UInt8, 1}, cost::UInt32, salt::AbstractArray{UInt8, 1}) :: Blowfish.Cipher
 	csalt = bcrypt_b64_decode(salt)
 	ckey = push!(key, 0x00)
 	c = Blowfish.NewSaltedCipher(ckey, csalt)
@@ -150,7 +156,7 @@ function Hash(obj::hashed)
 end
 Base.hash(p::hashed) = Hash(p)
 
-function decodeVersion(src::Array{UInt8, 1}) :: Tuple{Int, UInt8, UInt8}
+function decodeVersion(src::AbstractArray{UInt8, 1}) :: Tuple{Int, UInt8, UInt8}
 	src[1] != 0x24 && throw(InvalidHashPrefix())
 	src[2] > majorVersion && throw(HashVersionTooNew())
 	major = src[2]
@@ -162,7 +168,7 @@ function decodeVersion(src::Array{UInt8, 1}) :: Tuple{Int, UInt8, UInt8}
 	return n, minor, major
 end
 
-function decodeCost(src::Array{UInt8, 1}) :: Tuple{Int, Int}
+function decodeCost(src::AbstractArray{UInt8, 1}) :: Tuple{Int, Int}
 	cost = parse(Int, String(src[1:2]))
 	(cost > MaxCost || cost < MinCost) && throw(InvalidCost())
 	return 3, cost
