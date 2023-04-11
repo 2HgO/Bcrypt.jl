@@ -1,7 +1,7 @@
 name = "Bcrypt"
 uuid = "137488db-d2e6-4fb9-97f3-1e40a263e83c"
 authors = ["Oghogho Odemwingie <odemwingieog@gmail.com>"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
