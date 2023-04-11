@@ -55,7 +55,7 @@ end
 @inline function GenerateFromPassword(password::AbstractArray{UInt8, 1}, cost::Int = DefaultCost) :: Array{UInt8, 1}
 	hash(newFromPassword(password[1:end], cost))
 end
-GenerateFromPassword(password::String, cost::Int = DefaultCost) = GenerateFromPassword(Array{UInt8, 1}(password), cost) 
+GenerateFromPassword(password::AbstractString, cost::Int = DefaultCost) = GenerateFromPassword(Array{UInt8, 1}(password), cost) 
 
 """
 	CompareHashAndPassword compares a bcrypt hashed password with its possible plaintext equivalent. Returns `true` on success, or `false` on failure.
